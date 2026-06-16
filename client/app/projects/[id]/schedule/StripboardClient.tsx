@@ -22,7 +22,7 @@ function SceneStrip({ scene }: { scene: StripboardScene }) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: scene.scene_id });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
   };
 
@@ -80,6 +80,8 @@ export default function StripboardClient({ initialScenes }: { initialScenes: Str
         const oldIndex = items.findIndex((item) => item.scene_id === active.id);
         const newIndex = items.findIndex((item) => item.scene_id === over.id);
         
+        if (oldIndex === -1 || newIndex === -1) return items;
+
         const newOrder = arrayMove(items, oldIndex, newIndex);
         const orderedSceneIDs = newOrder.map(scene => scene.scene_id);
 

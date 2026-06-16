@@ -64,6 +64,12 @@ func main() {
 	r.Get("/api/projects/{id}/schedule", scheduleHandler.GetProjectSchedule)
 	r.Put("/api/projects/{id}/schedule/order", scheduleHandler.UpdateScheduleOrder)
 
+	// Initialize the handler
+	callSheetHandler := &handlers.CallSheetHandler{DB: db}
+
+	// Add the route right under your schedule endpoints
+	r.Get("/api/projects/{id}/callsheet", callSheetHandler.GenerateCallSheet)
+
 	// Get port from env or default to 8080
 	port := os.Getenv("PORT")
 	if port == "" {
