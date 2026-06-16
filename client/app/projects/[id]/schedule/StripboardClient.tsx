@@ -86,7 +86,7 @@ export default function StripboardClient({ initialScenes }: { initialScenes: Str
         const orderedSceneIDs = newOrder.map(scene => scene.scene_id);
 
         if (projectId) {
-          fetch(`http://localhost:8080/api/projects/${projectId}/schedule/order`, {
+          fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects/${projectId}/schedule/order`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',

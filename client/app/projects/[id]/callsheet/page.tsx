@@ -16,7 +16,7 @@ interface CallSheetScene {
 }
 
 async function getCallSheet(projectId: string): Promise<CallSheetScene[]> {
-  const res = await fetch(`http://localhost:8080/api/projects/${projectId}/callsheet`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects/${projectId}/callsheet`, {
     cache: 'no-store'
   });
   if (!res.ok) throw new Error('Failed to fetch call sheet');

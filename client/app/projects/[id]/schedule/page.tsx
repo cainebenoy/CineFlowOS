@@ -4,7 +4,7 @@ import StripboardClient from './StripboardClient';
 export const dynamic = 'force-dynamic';
 
 async function getSchedule(projectId: string) {
-  const res = await fetch(`http://localhost:8080/api/projects/${projectId}/schedule`, {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects/${projectId}/schedule`, {
     cache: 'no-store'
   });
   

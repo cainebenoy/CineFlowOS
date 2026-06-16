@@ -12,7 +12,7 @@ interface Project {
 // 2. Fetch data directly from our Go API Gateway
 async function getProjects(): Promise<Project[]> {
   // We use "no-store" to ensure it always fetches the freshest data from Postgres
-  const res = await fetch("http://localhost:8080/api/projects", { cache: "no-store" });
+  const res = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects`, { cache: "no-store" });
   if (!res.ok) {
     throw new Error("Failed to fetch projects");
   }

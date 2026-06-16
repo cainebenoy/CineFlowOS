@@ -20,8 +20,7 @@ export default function ScriptIngestionPage() {
     setError(null);
 
     try {
-      // Send the text to your FastAPI AI Worker
-      const res = await fetch('http://localhost:8000/api/ai/parse-brief', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_AI_API_URL || 'http://localhost:8000'}/api/ai/parse-brief`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
