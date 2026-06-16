@@ -90,16 +90,19 @@ func (h *ScheduleHandler) UpdateScheduleOrder(w http.ResponseWriter, r *http.Req
 	}
 	defer tx.Rollback(context.Background()) // Rolls back if commit isn't reached
 
-	// Prepare the update statement
-	query := `UPDATE scheduled_scenes SET sort_order = $1 WHERE scene_id = $2`
+	// Prepare the upsert statement
+	query := `
+		INSERT INTO scheduled_scenes (scene_id, sort_order)
+		VALUES ($1, $2)
+		ON CONFLICT (scene_id)
+		DO UPDATE SET sort_order = EXCLUDED.sort_order
+	`
 
-	// Loop through the array and execute the update for each ID
+	// Loop through the array and execute the upsert for each ID
 	for index, sceneID := range req.OrderedSceneIDs {
-		// If the scene isn't in scheduled_scenes yet (from the Boneyard), we'd insert it.
-		// For now, we assume they are already in the table or we handle upserts.
-		// To keep it simple, we will just update existing rows.
-		_, err := tx.Exec(context.Background(), query, index, sceneID)
+		_, err := tx.Exec(context.Background(), query, sceneID, index)
 		if err != nil {
+			log.Printf("Error upserting scheduled scene %s: %v", sceneID, err)
 			http.Error(w, `{"error": "Failed to update order"}`, http.StatusInternalServerError)
 			return
 		}

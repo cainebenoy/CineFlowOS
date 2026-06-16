@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -58,6 +58,12 @@ function SceneStrip({ scene }: { scene: StripboardScene }) {
 // 2. The Main Board Wrapper
 export default function StripboardClient({ initialScenes }: { initialScenes: StripboardScene[] }) {
   const [scenes, setScenes] = useState(initialScenes);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const params = useParams();
   const projectId = params?.id as string;
 
@@ -90,6 +96,41 @@ export default function StripboardClient({ initialScenes }: { initialScenes: Str
         return newOrder;
       });
     }
+  }
+
+  if (!mounted) {
+    // Render static, non-interactive skeleton layout on SSR to avoid hydration mismatch
+    return (
+      <div className="max-w-4xl mt-8">
+        <div className="mb-4">
+          <h2 className="text-sm font-bold text-neutral-500 uppercase tracking-wider mb-4">The Boneyard (Unscheduled)</h2>
+        </div>
+        <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4 min-h-[500px]">
+          {scenes.map((scene) => (
+            <div
+              key={scene.scene_id}
+              className="flex items-center gap-4 bg-white border border-neutral-300 p-3 mb-2 rounded shadow-sm"
+            >
+              <div className="text-neutral-400">
+                <GripVertical className="w-5 h-5" />
+              </div>
+              <div className="w-12 text-center font-mono text-lg font-medium border-r border-neutral-200 pr-4">
+                {scene.scene_number}
+              </div>
+              <div className="flex-shrink-0 w-16 text-xs font-bold tracking-wider text-neutral-500">
+                {scene.setting}
+              </div>
+              <div className="flex-shrink-0 w-24 text-xs font-bold tracking-wider text-neutral-500">
+                {scene.time_of_day}
+              </div>
+              <div className="flex-grow text-sm text-neutral-800 truncate">
+                {scene.summary}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   return (

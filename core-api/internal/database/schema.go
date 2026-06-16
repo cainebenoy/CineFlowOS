@@ -19,8 +19,8 @@ func (db *DB) InitSchema() error {
 	CREATE TABLE IF NOT EXISTS scenes (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
-		scene_number VARCHAR(10) NOT NULL,
-		setting VARCHAR(10),
+		scene_number VARCHAR(50) NOT NULL,
+		setting VARCHAR(50),
 		time_of_day VARCHAR(50),
 		page_eighths INT,
 		summary TEXT
@@ -30,7 +30,8 @@ func (db *DB) InitSchema() error {
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
 		category VARCHAR(50) NOT NULL,
-		name VARCHAR(255) NOT NULL
+		name VARCHAR(255) NOT NULL,
+		CONSTRAINT unique_project_element UNIQUE (project_id, category, name)
 	);
 
 	CREATE TABLE IF NOT EXISTS scene_elements (
@@ -52,7 +53,8 @@ func (db *DB) InitSchema() error {
 		shoot_day_id UUID REFERENCES shoot_days(id) ON DELETE SET NULL,
 		scene_id UUID REFERENCES scenes(id) ON DELETE CASCADE,
 		sort_order INT NOT NULL,
-		estimated_minutes INT DEFAULT 0
+		estimated_minutes INT DEFAULT 0,
+		CONSTRAINT unique_scheduled_scene UNIQUE (scene_id)
 	);
 	`
 
