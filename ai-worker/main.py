@@ -2,6 +2,7 @@ import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from dotenv import load_dotenv
@@ -37,6 +38,14 @@ class ParseRequest(BaseModel):
 
 # 3. Setup FastAPI and Database Connection
 app = FastAPI(title="CineFlow AI Worker")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Uses the same local Docker credentials
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:localpassword@localhost:5432/cineflow")
