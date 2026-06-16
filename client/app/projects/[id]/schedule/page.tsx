@@ -20,7 +20,7 @@ export default async function SchedulePage({ params }: { params: Promise<{ id: s
   const scenes = await getSchedule(id);
 
   return (
-    <main className="min-h-screen bg-neutral-100 text-neutral-900 font-sans p-8 md:p-12">
+    <main className="p-8 md:p-12">
       <div className="max-w-6xl mx-auto">
         <header className="border-b border-neutral-300 pb-6 mb-6">
           <h1 className="text-3xl font-semibold tracking-tight">Scheduling Board</h1>

@@ -46,7 +46,7 @@ export default function ScriptIngestionPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50 text-neutral-900 font-sans p-8 md:p-12">
+    <main className="p-8 md:p-12">
       <div className="max-w-4xl mx-auto">
         
         <header className="mb-8">

@@ -37,7 +37,7 @@ export default async function CallSheetPage({ params }: { params: Promise<{ id: 
     elements.filter(e => e.category.toLowerCase() !== 'cast').map(e => e.name).join(', ');
 
   return (
-    <main className="min-h-screen bg-neutral-200 py-8 font-sans print:bg-white print:py-0">
+    <main className="bg-neutral-200 py-8 print:bg-white print:py-0">
       {/* Action Bar (Hidden when printing) */}
       <div className="max-w-[800px] mx-auto mb-4 flex justify-end print:hidden">
         <PrintButton />
