@@ -46,7 +46,7 @@ export default function ScriptIngestionPage() {
 
   return (
     <main className="p-8 md:p-12">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         
         <header className="mb-8">
           <div className="flex items-center gap-3 mb-2">

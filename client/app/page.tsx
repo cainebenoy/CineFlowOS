@@ -1,4 +1,6 @@
-import { Calendar, Film, LayoutGrid, Plus, Video } from "lucide-react";
+import { Calendar, Film, LayoutGrid, Video } from "lucide-react";
+import Link from "next/link";
+import NewProjectButton from "./NewProjectButton";
 
 // 1. Define the TypeScript interface matching our Go struct
 interface Project {
@@ -52,10 +54,7 @@ export default async function Dashboard() {
             <h1 className="text-3xl font-semibold tracking-tight">CineFlow OS</h1>
             <p className="text-neutral-500 mt-1">Production Operations Dashboard</p>
           </div>
-          <button className="flex items-center gap-2 bg-neutral-900 hover:bg-neutral-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
-            <Plus className="w-4 h-4" />
-            New Project
-          </button>
+          <NewProjectButton />
         </header>
 
         {/* Projects Grid */}
@@ -66,9 +65,10 @@ export default async function Dashboard() {
             </div>
           ) : (
             projects.map((project) => (
-              <div
+              <Link
                 key={project.id}
-                className="group bg-white border border-neutral-200 rounded-lg p-5 hover:shadow-sm hover:border-neutral-300 transition-all cursor-pointer flex flex-col justify-between h-40"
+                href={`/projects/${project.id}/script`}
+                className="group bg-white border border-neutral-200 rounded-lg p-5 hover:shadow-sm hover:border-neutral-300 transition-all flex flex-col justify-between h-40"
               >
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
@@ -93,7 +93,7 @@ export default async function Dashboard() {
                   <span>Created {formatDate(project.created_at)}</span>
                   <LayoutGrid className="w-4 h-4 text-neutral-400 group-hover:text-neutral-900 transition-colors" />
                 </div>
-              </div>
+              </Link>
             ))
           )}
         </div>

@@ -14,16 +14,22 @@ type ScheduleHandler struct {
 	DB *database.DB
 }
 
+type ScheduleElement struct {
+	Category string `json:"category"`
+	Name     string `json:"name"`
+}
+
 // StripboardScene represents a single draggable strip on the board
 type StripboardScene struct {
-	ID               string `json:"id"`
-	SceneID          string `json:"scene_id"`
-	SceneNumber      string `json:"scene_number"`
-	Setting          string `json:"setting"`
-	TimeOfDay        string `json:"time_of_day"`
-	Summary          string `json:"summary"`
-	SortOrder        int    `json:"sort_order"`
-	EstimatedMinutes int    `json:"estimated_minutes"`
+	ID               string            `json:"id"`
+	SceneID          string            `json:"scene_id"`
+	SceneNumber      string            `json:"scene_number"`
+	Setting          string            `json:"setting"`
+	TimeOfDay        string            `json:"time_of_day"`
+	Summary          string            `json:"summary"`
+	SortOrder        int               `json:"sort_order"`
+	EstimatedMinutes int               `json:"estimated_minutes"`
+	Elements         []ScheduleElement `json:"elements"`
 }
 
 // GetProjectSchedule fetches all scenes and their schedule data for a project
@@ -31,6 +37,7 @@ func (h *ScheduleHandler) GetProjectSchedule(w http.ResponseWriter, r *http.Requ
 	projectID := chi.URLParam(r, "id")
 
 	// This query joins the static scene data with the dynamic scheduling data, using COALESCE to handle nullable columns
+	// It also joins breakdown elements and aggregates them into a JSON array
 	query := `
 		SELECT 
 			COALESCE(ss.id::text, '') as id, 
@@ -40,11 +47,21 @@ func (h *ScheduleHandler) GetProjectSchedule(w http.ResponseWriter, r *http.Requ
 			COALESCE(s.time_of_day, '') as time_of_day, 
 			COALESCE(s.summary, '') as summary, 
 			COALESCE(ss.sort_order, 0) as sort_order, 
-			COALESCE(ss.estimated_minutes, 0) as estimated_minutes
+			COALESCE(ss.estimated_minutes, 0) as estimated_minutes,
+			COALESCE(
+				json_agg(json_build_object('category', be.category, 'name', be.name)) 
+				FILTER (WHERE be.id IS NOT NULL), '[]'
+			) as elements
 		FROM scenes s
 		LEFT JOIN scheduled_scenes ss ON s.id = ss.scene_id
+		LEFT JOIN scene_elements se ON s.id = se.scene_id
+		LEFT JOIN breakdown_elements be ON se.element_id = be.id
 		WHERE s.project_id = $1
-		ORDER BY ss.sort_order ASC NULLS LAST, s.scene_number ASC
+		GROUP BY ss.id, s.id, s.scene_number, s.setting, s.time_of_day, s.summary, ss.sort_order, ss.estimated_minutes
+		ORDER BY 
+			ss.sort_order ASC NULLS LAST, 
+			CAST(NULLIF(regexp_replace(s.scene_number, '[^0-9]', '', 'g'), '') AS INTEGER) ASC NULLS LAST,
+			s.scene_number ASC
 	`
 	
 	rows, err := h.DB.Pool.Query(context.Background(), query, projectID)
@@ -58,10 +75,12 @@ func (h *ScheduleHandler) GetProjectSchedule(w http.ResponseWriter, r *http.Requ
 	scenes := make([]StripboardScene, 0)
 	for rows.Next() {
 		var s StripboardScene
-		if err := rows.Scan(&s.ID, &s.SceneID, &s.SceneNumber, &s.Setting, &s.TimeOfDay, &s.Summary, &s.SortOrder, &s.EstimatedMinutes); err != nil {
+		var elementsJSON []byte
+		if err := rows.Scan(&s.ID, &s.SceneID, &s.SceneNumber, &s.Setting, &s.TimeOfDay, &s.Summary, &s.SortOrder, &s.EstimatedMinutes, &elementsJSON); err != nil {
 			log.Printf("Row scan error: %v", err)
 			continue
 		}
+		json.Unmarshal(elementsJSON, &s.Elements)
 		scenes = append(scenes, s)
 	}
 

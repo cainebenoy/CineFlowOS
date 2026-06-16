@@ -111,7 +111,14 @@ def save_extraction_to_db(project_id: str, extraction: ScriptBreakdownResult):
 async def parse_brief(req: ParseRequest):
     try:
         # Define the strict instructions
-        system_prompt = "You are an elite Assistant Director. Break down the following script or client brief into distinct scenes. For each scene, identify the setting (INT/EXT), time of day (DAY/NIGHT/MAGIC HOUR), page_eighths (1-8), and list all Cast, Props, Vehicles, and Special Equipment. Be strictly accurate."
+        system_prompt = (
+            "You are an elite Assistant Director. Break down the following script or client brief into distinct production scenes. "
+            "CRITICAL RULES: "
+            "1. Merge continuous scenes: If actions happen at the same Location and Time without narrative breaks, group them into ONE master scene (e.g., ignore 'CUT TO:' or 'INTERCUT' if they are the same physical space/time). "
+            "2. Ensure scenes are numbered sequentially with integers only (1, 2, 3...) - NO letters (A, B, C...). "
+            "3. Deduplicate your output: Provide EXACTLY ONE sequence of scenes. Do NOT output the same scene twice. "
+            "4. For each scene, accurately extract setting (INT/EXT), time of day, page_eighths, and explicitly categorize 'Cast', 'Prop', 'Vehicle', and 'Special Equipment' in the elements list."
+        )
         
         # Call Gemini and force it to use your Pydantic schema
         response = client.models.generate_content(

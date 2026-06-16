@@ -37,13 +37,16 @@ func (h *CallSheetHandler) GenerateCallSheet(w http.ResponseWriter, r *http.Requ
 				json_agg(json_build_object('category', be.category, 'name', be.name)) 
 				FILTER (WHERE be.id IS NOT NULL), '[]'
 			) as elements
-		FROM scheduled_scenes ss
-		JOIN scenes s ON ss.scene_id = s.id
+		FROM scenes s
+		LEFT JOIN scheduled_scenes ss ON s.id = ss.scene_id
 		LEFT JOIN scene_elements se ON s.id = se.scene_id
 		LEFT JOIN breakdown_elements be ON se.element_id = be.id
 		WHERE s.project_id = $1
 		GROUP BY s.id, s.scene_number, s.setting, s.time_of_day, s.summary, ss.sort_order
-		ORDER BY ss.sort_order ASC
+		ORDER BY 
+			ss.sort_order ASC NULLS LAST, 
+			CAST(NULLIF(regexp_replace(s.scene_number, '[^0-9]', '', 'g'), '') AS INTEGER) ASC NULLS LAST,
+			s.scene_number ASC
 	`
 
 	rows, err := h.DB.Pool.Query(context.Background(), query, projectID)
