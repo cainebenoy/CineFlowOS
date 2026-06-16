@@ -68,3 +68,49 @@ func (h *ScheduleHandler) GetProjectSchedule(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(scenes)
 }
+
+// UpdateOrderRequest represents the incoming payload from the frontend
+type UpdateOrderRequest struct {
+	OrderedSceneIDs []string `json:"ordered_scene_ids"`
+}
+
+// UpdateScheduleOrder updates the sort_order of multiple scenes in one transaction
+func (h *ScheduleHandler) UpdateScheduleOrder(w http.ResponseWriter, r *http.Request) {
+	var req UpdateOrderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error": "Invalid request payload"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Begin a database transaction
+	tx, err := h.DB.Pool.Begin(context.Background())
+	if err != nil {
+		http.Error(w, `{"error": "Failed to start transaction"}`, http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(context.Background()) // Rolls back if commit isn't reached
+
+	// Prepare the update statement
+	query := `UPDATE scheduled_scenes SET sort_order = $1 WHERE scene_id = $2`
+
+	// Loop through the array and execute the update for each ID
+	for index, sceneID := range req.OrderedSceneIDs {
+		// If the scene isn't in scheduled_scenes yet (from the Boneyard), we'd insert it.
+		// For now, we assume they are already in the table or we handle upserts.
+		// To keep it simple, we will just update existing rows.
+		_, err := tx.Exec(context.Background(), query, index, sceneID)
+		if err != nil {
+			http.Error(w, `{"error": "Failed to update order"}`, http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(context.Background()); err != nil {
+		http.Error(w, `{"error": "Failed to commit transaction"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status": "success"}`))
+}

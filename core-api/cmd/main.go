@@ -62,6 +62,7 @@ func main() {
 	r.Get("/api/projects", projectHandler.ListProjects)
 	r.Post("/api/projects", projectHandler.CreateProject)
 	r.Get("/api/projects/{id}/schedule", scheduleHandler.GetProjectSchedule)
+	r.Put("/api/projects/{id}/schedule/order", scheduleHandler.UpdateScheduleOrder)
 
 	// Get port from env or default to 8080
 	port := os.Getenv("PORT")
