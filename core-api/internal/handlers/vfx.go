@@ -14,7 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
-	"cineflow/internal/database"
+	"github.com/cainebenoy/CineFlowOS/core-api/internal/database"
 )
 
 var s3Client *s3.Client
@@ -24,8 +24,8 @@ var bucketName = "cineflow-vfx"
 // Initialize S3 client with MinIO configurations
 func init() {
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		aws.WithRegion("us-east-1"), // Required by SDK, ignored by MinIO
-		aws.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+		config.WithRegion("us-east-1"), // Required by SDK, ignored by MinIO
+		config.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
 			// Using the local MinIO credentials from docker-compose
 			return aws.Credentials{
 				AccessKeyID:     "local_admin",

@@ -12,6 +12,7 @@ export default function ProjectNav({ projectId }: { projectId: string }) {
     { name: 'Script Ingestion', path: `/projects/${projectId}/script`, icon: FileText, exact: false },
     { name: 'Schedule Board', path: `/projects/${projectId}/schedule`, icon: CalendarDays, exact: false },
     { name: 'Call Sheet', path: `/projects/${projectId}/callsheet`, icon: Printer, exact: false },
+    { name: 'Daily Progress', path: `/projects/${projectId}/dpr`, icon: LayoutGrid, exact: false },
     { name: 'Continuity Log', path: `/projects/${projectId}/continuity`, icon: Clapperboard, exact: false },
     { name: 'Financial Ledger', path: `/projects/${projectId}/budget`, icon: Calculator, exact: false },
     { name: 'Tax & Compliance', path: `/projects/${projectId}/taxes`, icon: FileSpreadsheet, exact: false },

@@ -114,6 +114,10 @@ func main() {
 	r.Get("/api/projects/{id}/taxes", taxesHandler.GetTaxLedger)
 	r.Get("/api/projects/{id}/taxes/export", taxesHandler.ExportTDSReport)
 
+	// Daily Progress Report (DPR)
+	dprHandler := &handlers.DPRHandler{DB: db}
+	r.Get("/api/projects/{id}/dpr", dprHandler.GetDPR)
+
 	// VFX Pipeline & Assets
 	r.Get("/api/projects/{id}/vfx", handlers.GetVFXShots(db))
 	r.Post("/api/projects/{id}/vfx", handlers.CreateVFXShot(db))
