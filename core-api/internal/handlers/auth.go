@@ -6,19 +6,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/cainebenoy/CineFlowOS/core-api/internal/database"
+	"github.com/cainebenoy/CineFlowOS/core-api/internal/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
-	"github.com/cainebenoy/CineFlowOS/core-api/internal/database"
 )
 
-// In production, this should be an environment variable
+// In production, this should be imported from a central config
 var jwtKey = []byte("my_super_secret_cineflow_key_123!")
-
-type Claims struct {
-	UserID   string `json:"user_id"`
-	RoleName string `json:"role_name"`
-	jwt.RegisteredClaims
-}
 
 type AuthHandler struct {
 	DB *database.DB
@@ -36,12 +31,12 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var userID, passwordHash, roleName string
+	var userID, passwordHash string
 
 	// Fetch user from DB
 	err := h.DB.Pool.QueryRow(context.Background(), `
-		SELECT id, password_hash, role_name FROM users WHERE email = $1
-	`, req.Email).Scan(&userID, &passwordHash, &roleName)
+		SELECT id, password_hash FROM users WHERE email = $1
+	`, req.Email).Scan(&userID, &passwordHash)
 
 	if err != nil {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
@@ -59,9 +54,8 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	expirationTime := time.Now().Add(24 * time.Hour)
 
 	// Create the JWT claims
-	claims := &Claims{
+	claims := &middleware.Claims{
 		UserID:   userID,
-		RoleName: roleName,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 		},
@@ -80,7 +74,6 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		"user": map[string]string{
 			"id":    userID,
 			"email": req.Email,
-			"role":  roleName,
 		},
 	})
 }

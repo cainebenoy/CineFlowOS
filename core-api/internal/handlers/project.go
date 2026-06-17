@@ -4,84 +4,115 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/cainebenoy/CineFlowOS/core-api/internal/database"
+	"github.com/cainebenoy/CineFlowOS/core-api/internal/middleware"
 )
 
-// Project represents the data structure of a film/video production.
-type Project struct {
-	ID          string    `json:"id"`
-	Title       string    `json:"title"`
-	ProjectType string    `json:"project_type"`
-	Status      string    `json:"status"`
-	CreatedAt   time.Time `json:"created_at"`
-}
-
-// ProjectHandler holds the database connection pool
 type ProjectHandler struct {
 	DB *database.DB
 }
 
-// CreateProject handles POST requests to create a new production
-func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
-	// Parse the incoming JSON payload
-	var p struct {
-		Title       string `json:"title"`
-		ProjectType string `json:"project_type"`
-	}
-
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		http.Error(w, `{"error": "Invalid request payload"}`, http.StatusBadRequest)
-		return
-	}
-
-	var id string
-	var createdAt time.Time
-	
-	// Execute the insertion and instantly return the generated UUID and timestamp
-	query := `INSERT INTO projects (title, project_type) VALUES ($1, $2) RETURNING id, created_at`
-	err := h.DB.Pool.QueryRow(context.Background(), query, p.Title, p.ProjectType).Scan(&id, &createdAt)
-	
-	if err != nil {
-		http.Error(w, `{"error": "Failed to create project"}`, http.StatusInternalServerError)
-		return
-	}
-
-	// Respond with the newly created object
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(Project{
-		ID:          id,
-		Title:       p.Title,
-		ProjectType: p.ProjectType,
-		Status:      "active",
-		CreatedAt:   createdAt,
-	})
+type CreateProjectRequest struct {
+	Title       string `json:"title"`
+	ProjectType string `json:"project_type"`
 }
 
-// ListProjects handles GET requests to fetch all productions
-func (h *ProjectHandler) ListProjects(w http.ResponseWriter, r *http.Request) {
-	query := `SELECT id, title, project_type, status, created_at FROM projects ORDER BY created_at DESC`
-	rows, err := h.DB.Pool.Query(context.Background(), query)
-	
+func (h *ProjectHandler) GetProjects(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetClaims(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	rows, err := h.DB.Pool.Query(context.Background(), `
+		SELECT p.id, p.title, p.project_type, p.status, pu.role_name
+		FROM projects p
+		JOIN project_users pu ON p.id = pu.project_id
+		WHERE pu.user_id = $1
+		ORDER BY p.created_at DESC
+	`, claims.UserID)
+
 	if err != nil {
-		http.Error(w, `{"error": "Failed to fetch projects"}`, http.StatusInternalServerError)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
-	// Initialize as an empty slice so it returns [] instead of null if the DB is empty
-	projects := make([]Project, 0)
-	
+	var projects []map[string]interface{}
 	for rows.Next() {
-		var p Project
-		if err := rows.Scan(&p.ID, &p.Title, &p.ProjectType, &p.Status, &p.CreatedAt); err != nil {
+		var id, title, projectType, status, roleName string
+		if err := rows.Scan(&id, &title, &projectType, &status, &roleName); err != nil {
 			continue
 		}
-		projects = append(projects, p)
+		projects = append(projects, map[string]interface{}{
+			"id":           id,
+			"title":        title,
+			"project_type": projectType,
+			"status":       status,
+			"role":         roleName,
+		})
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(projects)
+}
+
+func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetClaims(r.Context())
+	if !ok {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req CreateProjectRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	ctx := context.Background()
+	tx, err := h.DB.Pool.Begin(ctx)
+	if err != nil {
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback(ctx)
+
+	var projectID string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO projects (title, project_type, status)
+		VALUES ($1, $2, 'active')
+		RETURNING id
+	`, req.Title, req.ProjectType).Scan(&projectID)
+
+	if err != nil {
+		http.Error(w, "Failed to create project", http.StatusInternalServerError)
+		return
+	}
+
+	// Immediately grant Admin/Line Producer access to the creator
+	_, err = tx.Exec(ctx, `
+		INSERT INTO project_users (project_id, user_id, role_name)
+		VALUES ($1, $2, 'Line Producer')
+	`, projectID, claims.UserID)
+
+	if err != nil {
+		http.Error(w, "Failed to assign project permissions", http.StatusInternalServerError)
+		return
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		http.Error(w, "Failed to commit transaction", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":           projectID,
+		"title":        req.Title,
+		"project_type": req.ProjectType,
+		"role":         "Line Producer",
+	})
 }

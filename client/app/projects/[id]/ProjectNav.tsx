@@ -10,14 +10,26 @@ export default function ProjectNav({ projectId }: { projectId: string }) {
   const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const userStr = localStorage.getItem('cineflow_user');
-    if (userStr) {
+    const fetchRole = async () => {
+      const token = localStorage.getItem('cineflow_token');
+      if (!token) return;
       try {
-        const user = JSON.parse(userStr);
-        setRole(user.role);
-      } catch (e) {}
-    }
-  }, []);
+        const res = await fetch('http://localhost:8080/api/projects', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const projects = await res.json();
+          const activeProject = projects.find((p: any) => p.id === projectId);
+          if (activeProject) {
+            setRole(activeProject.role);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch role", e);
+      }
+    };
+    fetchRole();
+  }, [projectId]);
 
   const allNavItems = [
     { name: 'All Projects', path: `/`, icon: LayoutGrid, exact: true },

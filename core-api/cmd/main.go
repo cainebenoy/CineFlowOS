@@ -57,6 +57,9 @@ func main() {
 	// Apply JWT Authentication Middleware to all routes
 	// Note: RequireAuth internally allows /api/auth/login and OPTIONS to pass through
 	r.Use(customMiddleware.RequireAuth)
+	
+	// Apply Project Access Verification (Passes through if no {id} in URL)
+	r.Use(customMiddleware.RequireProjectAccess(db))
 
 	// Auth Route
 	r.Post("/api/auth/login", authHandler.Login)
@@ -68,7 +71,7 @@ func main() {
 	})
 
 	// Define explicit routes (handles the missing trailing slash natively)
-	r.Get("/api/projects", projectHandler.ListProjects)
+	r.Get("/api/projects", projectHandler.GetProjects)
 	r.Post("/api/projects", projectHandler.CreateProject)
 	r.Get("/api/projects/{id}/schedule", scheduleHandler.GetProjectSchedule)
 	r.Put("/api/projects/{id}/schedule/order", scheduleHandler.UpdateScheduleOrder)

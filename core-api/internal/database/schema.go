@@ -242,21 +242,45 @@ func (db *DB) InitSchema() error {
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 
-	-- RBAC Users Table
+	-- RBAC Users Table (Authentication Only)
 	CREATE TABLE IF NOT EXISTS users (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		email VARCHAR(255) UNIQUE NOT NULL,
 		password_hash VARCHAR(255) NOT NULL,
-		role_name VARCHAR(50) NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 
-	INSERT INTO users (email, password_hash, role_name)
+	-- Migration: Drop role_name if it exists from previous schema
+	ALTER TABLE users DROP COLUMN IF EXISTS role_name;
+
+	-- Multi-Tenancy Project Users Table (Authorization)
+	CREATE TABLE IF NOT EXISTS project_users (
+		project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+		user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+		role_name VARCHAR(50) NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (project_id, user_id)
+	);
+
+	-- Seed Demo Users
+	INSERT INTO users (email, password_hash)
 	VALUES 
-		('lp@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Line Producer'),
-		('ad@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Assistant Director'),
-		('vfx@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'VFX Supervisor')
+		('lp@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'),
+		('ad@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'),
+		('vfx@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy')
 	ON CONFLICT (email) DO NOTHING;
+
+	-- Seed Project Access for Demo Users
+	INSERT INTO project_users (project_id, user_id, role_name)
+	SELECT '85bf2069-e3fe-40e8-8739-8ad1cbeebf87', id, 
+		CASE email 
+			WHEN 'lp@cineflow.com' THEN 'Line Producer'
+			WHEN 'ad@cineflow.com' THEN 'Assistant Director'
+			WHEN 'vfx@cineflow.com' THEN 'VFX Supervisor'
+		END
+	FROM users 
+	WHERE email IN ('lp@cineflow.com', 'ad@cineflow.com', 'vfx@cineflow.com')
+	ON CONFLICT (project_id, user_id) DO NOTHING;
 	`
 
 	_, err := db.Pool.Exec(context.Background(), schema)

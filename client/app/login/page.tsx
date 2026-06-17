@@ -33,8 +33,8 @@ export default function LoginPage() {
       localStorage.setItem('cineflow_token', data.token);
       localStorage.setItem('cineflow_user', JSON.stringify(data.user));
 
-      // Redirect to the default project for demo purposes
-      router.push('/projects/85bf2069-e3fe-40e8-8739-8ad1cbeebf87/schedule');
+      // Redirect to the multi-tenant Studio Dashboard
+      router.push('/projects');
       
     } catch (err: any) {
       setError(err.message || 'Login failed');
