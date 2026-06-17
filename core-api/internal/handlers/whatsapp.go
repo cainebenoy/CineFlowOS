@@ -15,7 +15,7 @@ type WhatsAppHandler struct {
 	DB *database.DB
 }
 
-type CrewMember struct {
+type WhatsAppCrewMember struct {
 	Name        string `json:"name"`
 	Role        string `json:"role"`
 	PhoneNumber string `json:"phone_number"`
@@ -34,9 +34,9 @@ func (h *WhatsAppHandler) DistributeCallSheet(w http.ResponseWriter, r *http.Req
 	}
 	defer rows.Close()
 
-	var crew []CrewMember
+	var crew []WhatsAppCrewMember
 	for rows.Next() {
-		var c CrewMember
+		var c WhatsAppCrewMember
 		if err := rows.Scan(&c.Name, &c.Role, &c.PhoneNumber); err == nil {
 			crew = append(crew, c)
 		}
@@ -49,7 +49,7 @@ func (h *WhatsAppHandler) DistributeCallSheet(w http.ResponseWriter, r *http.Req
 	// 3. Fire off the requests concurrently
 	for _, member := range crew {
 		wg.Add(1)
-		go func(c CrewMember) {
+		go func(c WhatsAppCrewMember) {
 			defer wg.Done()
 			
 			// Simulate the Meta API call (Replace with actual Meta Graph API request later)

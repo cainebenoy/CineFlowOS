@@ -126,6 +126,26 @@ func (db *DB) InitSchema() error {
 	CREATE TRIGGER audit_budget_trigger
 	AFTER UPDATE ON breakdown_elements
 	FOR EACH ROW EXECUTE FUNCTION audit_financials_func();
+
+	-- Crew & Payroll Engine: Upgrade crew_members with payroll fields
+	ALTER TABLE crew_members ADD COLUMN IF NOT EXISTS daily_rate DECIMAL(10,2) DEFAULT 0.00;
+	ALTER TABLE crew_members ADD COLUMN IF NOT EXISTS upi_id VARCHAR(100);
+	ALTER TABLE crew_members ADD COLUMN IF NOT EXISTS pan_number VARCHAR(10);
+
+	-- Attendance Ledger: Tracks daily geo-fenced punches
+	CREATE TABLE IF NOT EXISTS attendance_logs (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+		crew_id UUID REFERENCES crew_members(id) ON DELETE CASCADE,
+		check_in_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		latitude DECIMAL(10,8),
+		longitude DECIMAL(11,8),
+		status VARCHAR(20) DEFAULT 'Present'
+	);
+
+	-- Prevent double clock-ins on the same calendar day per crew member
+	CREATE UNIQUE INDEX IF NOT EXISTS unique_daily_checkin
+	ON attendance_logs (crew_id, (check_in_time::DATE));
 	`
 
 	_, err := db.Pool.Exec(context.Background(), schema)

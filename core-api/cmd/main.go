@@ -92,6 +92,12 @@ func main() {
 	auditHandler := &handlers.AuditHandler{DB: db}
 	r.Get("/api/projects/{id}/audit", auditHandler.GetAuditLogs)
 
+	// Crew & Payroll Engine
+	attendanceHandler := &handlers.AttendanceHandler{DB: db}
+	r.Get("/api/projects/{id}/crew", attendanceHandler.GetCrewRoster)
+	r.Post("/api/projects/{id}/attendance/check-in", attendanceHandler.LogCheckIn)
+	r.Get("/api/projects/{id}/attendance/today", attendanceHandler.GetTodaysAttendance)
+
 	// Get port from env or default to 8080
 	port := os.Getenv("PORT")
 	if port == "" {
