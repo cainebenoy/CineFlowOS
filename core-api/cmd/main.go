@@ -109,6 +109,11 @@ func main() {
 	r.Get("/api/projects/{id}/expenses", expenseHandler.GetExpenses)
 	r.Put("/api/projects/{id}/expenses/{expenseId}/status", expenseHandler.UpdateExpenseStatus)
 
+	// Tax Automation & Compliance Ledger
+	taxesHandler := &handlers.TaxesHandler{DB: db}
+	r.Get("/api/projects/{id}/taxes", taxesHandler.GetTaxLedger)
+	r.Get("/api/projects/{id}/taxes/export", taxesHandler.ExportTDSReport)
+
 	// Get port from env or default to 8080
 	port := os.Getenv("PORT")
 	if port == "" {

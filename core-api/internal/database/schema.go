@@ -161,6 +161,64 @@ func (db *DB) InitSchema() error {
 		notes TEXT,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
+	-- Tax Automation: Upgrades for crew and expenses
+	ALTER TABLE crew_members ADD COLUMN IF NOT EXISTS tds_section VARCHAR(10) DEFAULT '194J';
+	
+	ALTER TABLE expenses ADD COLUMN IF NOT EXISTS pan_number VARCHAR(10);
+	ALTER TABLE expenses ADD COLUMN IF NOT EXISTS tds_section VARCHAR(10) DEFAULT '194C';
+	ALTER TABLE expenses ADD COLUMN IF NOT EXISTS tax_withheld DECIMAL(12,2) DEFAULT 0.00;
+
+	-- Tax Ledger Table
+	CREATE TABLE IF NOT EXISTS tax_withholdings (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+		entity_type VARCHAR(50) NOT NULL, -- 'Crew' or 'Vendor'
+		entity_id UUID NOT NULL,
+		section VARCHAR(10) NOT NULL,
+		gross_amount DECIMAL(12,2) NOT NULL,
+		tds_deducted DECIMAL(12,2) NOT NULL,
+		net_payable DECIMAL(12,2) NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	-- Trigger function to calculate TDS
+	CREATE OR REPLACE FUNCTION calculate_tds_func() RETURNS trigger AS $$
+	DECLARE
+		tds_rate DECIMAL(5,2);
+		tds_amount DECIMAL(12,2);
+	BEGIN
+		IF TG_OP = 'UPDATE' AND OLD.status = 'Pending' AND NEW.status = 'Approved' THEN
+			-- Determine rate based on section and PAN availability
+			IF NEW.tds_section = '194C' THEN
+				tds_rate := 0.02; -- Assume 2% for contractors
+			ELSIF NEW.tds_section = '194J' THEN
+				tds_rate := 0.10; -- Assume 10% for professional services
+			ELSE
+				tds_rate := 0.00;
+			END IF;
+
+			-- Enforce 20% if no PAN
+			IF NEW.pan_number IS NULL OR NEW.pan_number = '' THEN
+				tds_rate := 0.20;
+			END IF;
+
+			tds_amount := NEW.amount * tds_rate;
+			NEW.tax_withheld := tds_amount;
+
+			-- Write to tax ledger
+			INSERT INTO tax_withholdings (project_id, entity_type, entity_id, section, gross_amount, tds_deducted, net_payable)
+			VALUES (NEW.project_id, 'Vendor', NEW.id, NEW.tds_section, NEW.amount, tds_amount, NEW.amount - tds_amount);
+
+			RETURN NEW;
+		END IF;
+		RETURN NEW;
+	END;
+	$$ LANGUAGE plpgsql;
+
+	DROP TRIGGER IF EXISTS expense_tds_trigger ON expenses;
+	CREATE TRIGGER expense_tds_trigger
+	BEFORE UPDATE ON expenses
+	FOR EACH ROW EXECUTE FUNCTION calculate_tds_func();
 	`
 
 	_, err := db.Pool.Exec(context.Background(), schema)
