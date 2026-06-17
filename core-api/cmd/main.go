@@ -64,6 +64,10 @@ func main() {
 	r.Get("/api/projects/{id}/schedule", scheduleHandler.GetProjectSchedule)
 	r.Put("/api/projects/{id}/schedule/order", scheduleHandler.UpdateScheduleOrder)
 
+	// Script File Upload (.fountain / .txt) → Go → Python AI Worker
+	scriptUploadHandler := &handlers.ScriptUploadHandler{}
+	r.Post("/api/projects/{id}/script/upload", scriptUploadHandler.UploadScript)
+
 	// Initialize the handlers
 	callSheetHandler := &handlers.CallSheetHandler{DB: db}
 	r.Get("/api/projects/{id}/callsheet", callSheetHandler.GenerateCallSheet)

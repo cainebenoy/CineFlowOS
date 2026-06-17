@@ -1,4 +1,5 @@
 import os
+import re
 import base64
 import psycopg2
 from io import BytesIO
@@ -146,6 +147,131 @@ async def parse_brief(req: ParseRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── .fountain / .txt Script Parser ───────────────────────────────────────────
+
+class FountainScene:
+    """Represents one parsed scene block extracted from a Fountain file."""
+    def __init__(self, number: int, heading: str, body: str):
+        self.number = number
+        self.heading = heading
+        self.body = body
+
+    def to_prompt_block(self) -> str:
+        return f"SCENE {self.number}:\n{self.heading}\n\n{self.body}"
+
+
+# Matches any Fountain/FDX scene heading:
+#   INT. LOCATION - DAY  |  EXT. PLACE - NIGHT  |  INT/EXT. SOMEWHERE - DUSK
+_SCENE_HEADING_RE = re.compile(
+    r'^(INT\.?/EXT\.?|EXT\.?/INT\.?|INT\.?|EXT\.?)\s+.+?-\s*.+',
+    re.IGNORECASE | re.MULTILINE
+)
+
+def parse_fountain(text: str) -> list[FountainScene]:
+    """
+    Splits raw Fountain (or plain-text screenplay) into discrete scene blocks.
+    Returns a list of FountainScene objects, one per scene heading found.
+    Falls back to treating the entire text as a single scene if no headings
+    are detected (handles pasted briefs / non-standard scripts gracefully).
+    """
+    # Find all scene heading positions
+    matches = list(_SCENE_HEADING_RE.finditer(text))
+
+    if not matches:
+        # No Fountain headings found — treat entire text as one scene block
+        return [FountainScene(1, "SCENE - UNSPECIFIED", text.strip())]
+
+    scenes = []
+    for i, match in enumerate(matches):
+        heading = match.group(0).strip()
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        body = text[start:end].strip()
+        scenes.append(FountainScene(i + 1, heading, body))
+
+    return scenes
+
+
+class FountainParseRequest(BaseModel):
+    project_id: str
+    # Raw text content of the .fountain or .txt file (sent by Go gateway)
+    script_text: str
+
+
+@app.post("/api/ai/parse-fountain")
+async def parse_fountain_script(req: FountainParseRequest):
+    """
+    Accepts the raw text of a .fountain file, parses it into discrete scenes,
+    then calls Gemini once per scene to extract breakdown elements.
+    This scene-by-scene approach:
+    - Eliminates context-window overflow on long scripts
+    - Gives Gemini perfectly structured input (no hallucination of scene numbers)
+    - Allows partial saves if one scene fails without losing the entire run
+    """
+    scenes = parse_fountain(req.script_text)
+
+    if not scenes:
+        raise HTTPException(status_code=422, detail="No scenes could be extracted from the script.")
+
+    # We build a synthetic ScriptBreakdownResult so we can reuse save_extraction_to_db
+    all_scene_extractions = []
+    failed_scenes = []
+
+    for scene in scenes:
+        try:
+            scene_prompt = (
+                "You are an elite Assistant Director breaking down a film script scene for production planning. "
+                "Analyze the scene block below and extract structured breakdown data. "
+                "RULES: "
+                "1. scene_number must match the scene number provided (integer only). "
+                "2. setting must be exactly 'INT' or 'EXT'. "
+                "3. time_of_day: 'DAY', 'NIGHT', 'MAGIC HOUR', 'DUSK', or 'DAWN'. "
+                "4. page_eighths: estimate how many eighths of a page this scene takes (1–8). "
+                "5. elements: extract EVERY unique Cast member, Prop, Vehicle, Special Equipment, "
+                "   or VFX note mentioned. Use exact category labels: 'Cast', 'Prop', 'Vehicle', "
+                "   'Special Equipment', 'VFX'. "
+                "6. summary: one sentence describing the dramatic action.\n\n"
+                f"{scene.to_prompt_block()}"
+            )
+
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[scene_prompt],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=SceneExtraction,
+                ),
+            )
+
+            extracted = SceneExtraction.model_validate_json(response.text)
+            # Enforce sequential scene numbering from our parser (not Gemini's guess)
+            extracted.scene_number = str(scene.number)
+            all_scene_extractions.append(extracted)
+
+        except Exception as e:
+            # Log failure for this scene but continue processing remaining scenes
+            failed_scenes.append({"scene": scene.number, "heading": scene.heading, "error": str(e)})
+            continue
+
+    if not all_scene_extractions:
+        raise HTTPException(
+            status_code=500,
+            detail=f"All {len(scenes)} scenes failed to parse. Errors: {failed_scenes}"
+        )
+
+    # Persist all successfully parsed scenes using the existing DB function
+    result = ScriptBreakdownResult(scenes=all_scene_extractions)
+    save_extraction_to_db(req.project_id, result)
+
+    return {
+        "status": "success",
+        "message": f"Parsed {len(all_scene_extractions)} of {len(scenes)} scenes successfully.",
+        "scenes_parsed": len(all_scene_extractions),
+        "scenes_failed": len(failed_scenes),
+        "failures": failed_scenes,
+    }
 
 
 # ── OCR Receipt Scanner ──────────────────────────────────────────────────────
