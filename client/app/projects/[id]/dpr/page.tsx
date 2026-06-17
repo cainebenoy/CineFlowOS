@@ -17,7 +17,7 @@ export default function DPRDashboard({ params }: { params: Promise<{ id: string 
   const fetchDPR = async () => {
     try {
       setLoading(true);
-      const res = await fetch(`http://localhost:8080/api/projects/${projectId}/dpr?date=${date}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects/${projectId}/dpr?date=${date}`);
       if (res.ok) {
         const data = await res.json();
         setDpr(data);

@@ -19,7 +19,7 @@ export default function ContinuityLogPage() {
   useEffect(() => {
     const fetchContext = async () => {
       try {
-        const schedRes = await fetch(`http://localhost:8080/api/projects/${id}/schedule`);
+        const schedRes = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects/${id}/schedule`);
         if (schedRes.ok) {
             const data = await schedRes.json();
             if (data && data.length > 0) {
@@ -29,7 +29,7 @@ export default function ContinuityLogPage() {
         }
         
         // Fetch existing takes
-        const takesRes = await fetch(`http://localhost:8080/api/projects/${id}/takes`);
+        const takesRes = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects/${id}/takes`);
         if (takesRes.ok) {
             const takesData = await takesRes.json();
             if (takesData && takesData.length > 0) {
@@ -64,7 +64,7 @@ export default function ContinuityLogPage() {
     };
 
     try {
-      const response = await fetch(`http://localhost:8080/api/projects/${id}/takes`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects/${id}/takes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

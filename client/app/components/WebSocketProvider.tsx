@@ -24,8 +24,13 @@ export function WebSocketProvider({
     const token = localStorage.getItem("cineflow_token");
     if (!token || !projectId) return;
 
-    // Connect to the WebSocket Hub
-    const wsUrl = `ws://localhost:8080/api/ws?token=${token}&projectId=${projectId}`;
+    // Connect to the WebSocket Hub dynamically
+    const apiBaseUrl = process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080';
+    // Strip http:// or https:// from apiBaseUrl
+    const wsHost = apiBaseUrl.replace(/^https?:\/\//, '');
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    
+    const wsUrl = `${wsProtocol}//${wsHost}/api/ws?token=${token}&projectId=${projectId}`;
     const ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
@@ -42,9 +47,9 @@ export function WebSocketProvider({
         if (data.type === "TAKE_LOGGED") {
           console.log("[WebSocket] Invalidating SWR cache for takes...");
           // We trigger a silent background re-fetch for the Continuity timeline
-          mutate(`http://localhost:8080/api/projects/${projectId}/takes`);
+          mutate(`${apiBaseUrl}/api/projects/${projectId}/takes`);
           // We can also trigger a re-fetch for the DPR since a new take affects the daily count
-          mutate(`http://localhost:8080/api/projects/${projectId}/dpr`);
+          mutate(`${apiBaseUrl}/api/projects/${projectId}/dpr`);
         }
       } catch (err) {
         console.error("[WebSocket] Failed to parse message:", err);

@@ -14,7 +14,7 @@ export default function ProjectNav({ projectId }: { projectId: string }) {
       const token = localStorage.getItem('cineflow_token');
       if (!token) return;
       try {
-        const res = await fetch('http://localhost:8080/api/projects', {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {

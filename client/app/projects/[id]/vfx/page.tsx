@@ -16,7 +16,7 @@ export default function VFXDashboard({ params }: { params: Promise<{ id: string 
 
   const fetchShots = async () => {
     try {
-      const res = await fetch(`http://localhost:8080/api/projects/${projectId}/vfx`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects/${projectId}/vfx`);
       if (res.ok) {
         const data = await res.json();
         setShots(data || []);
@@ -33,7 +33,7 @@ export default function VFXDashboard({ params }: { params: Promise<{ id: string 
       setUploadingId(shotId);
 
       // 1. Get Presigned URL
-      const presignRes = await fetch(`http://localhost:8080/api/projects/${projectId}/vfx/presigned-url`, {
+      const presignRes = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects/${projectId}/vfx/presigned-url`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -56,7 +56,7 @@ export default function VFXDashboard({ params }: { params: Promise<{ id: string 
       if (!uploadRes.ok) throw new Error('Direct upload failed');
 
       // 3. Log asset in PostgreSQL
-      await fetch(`http://localhost:8080/api/projects/${projectId}/vfx/assets`, {
+      await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects/${projectId}/vfx/assets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

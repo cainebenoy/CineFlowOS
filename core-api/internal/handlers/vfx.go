@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -21,16 +22,35 @@ var s3Client *s3.Client
 var presignClient *s3.PresignClient
 var bucketName = "cineflow-vfx"
 
-// Initialize S3 client with MinIO configurations
+// Initialize S3 client with MinIO configurations or R2 credentials
 func init() {
+	endpoint := os.Getenv("R2_ENDPOINT_URL")
+	if endpoint == "" {
+		endpoint = "http://localhost:9000"
+	}
+	
+	accessKey := os.Getenv("R2_ACCESS_KEY_ID")
+	if accessKey == "" {
+		accessKey = "local_admin"
+	}
+	
+	secretKey := os.Getenv("R2_SECRET_ACCESS_KEY")
+	if secretKey == "" {
+		secretKey = "localpassword"
+	}
+
+	envBucket := os.Getenv("R2_BUCKET_NAME")
+	if envBucket != "" {
+		bucketName = envBucket
+	}
+
 	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		config.WithRegion("us-east-1"), // Required by SDK, ignored by MinIO
+		config.WithRegion("us-east-1"), // Required by SDK, ignored by MinIO/R2
 		config.WithCredentialsProvider(aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
-			// Using the local MinIO credentials from docker-compose
 			return aws.Credentials{
-				AccessKeyID:     "local_admin",
-				SecretAccessKey: "localpassword",
-				Source:          "HardcodedMinIO",
+				AccessKeyID:     accessKey,
+				SecretAccessKey: secretKey,
+				Source:          "EnvironmentOrMinIO",
 			}, nil
 		})),
 	)
@@ -38,25 +58,24 @@ func init() {
 		log.Fatalf("unable to load SDK config, %v", err)
 	}
 
-	// Override the endpoint to point to local MinIO
+	// Override the endpoint
 	s3Client = s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String("http://localhost:9000")
-		o.UsePathStyle = true // CRITICAL for MinIO compatibility
+		o.BaseEndpoint = aws.String(endpoint)
+		o.UsePathStyle = true // CRITICAL for MinIO and R2 compatibility
 	})
 	
 	presignClient = s3.NewPresignClient(s3Client)
 	
 	// Create bucket if it doesn't exist
 	go func() {
-		// Wait a moment for MinIO to start up
 		time.Sleep(5 * time.Second)
 		_, err := s3Client.CreateBucket(context.TODO(), &s3.CreateBucketInput{
 			Bucket: aws.String(bucketName),
 		})
 		if err != nil {
-			log.Printf("Bucket %s might already exist or MinIO is unreachable: %v", bucketName, err)
+			log.Printf("Bucket %s might already exist or storage is unreachable: %v", bucketName, err)
 		} else {
-			log.Printf("Successfully created bucket %s in MinIO", bucketName)
+			log.Printf("Successfully created bucket %s", bucketName)
 		}
 	}()
 }
@@ -159,7 +178,11 @@ func GeneratePresignedURL() http.HandlerFunc {
 		uploadURL := presignedReq.URL
 		
 		// The URL Next.js will save in the database after successful upload
-		fileURL := fmt.Sprintf("http://localhost:9000/%s/%s", bucketName, objectKey)
+		endpoint := os.Getenv("R2_ENDPOINT_URL")
+		if endpoint == "" {
+			endpoint = "http://localhost:9000"
+		}
+		fileURL := fmt.Sprintf("%s/%s/%s", endpoint, bucketName, objectKey)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{

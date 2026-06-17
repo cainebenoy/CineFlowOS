@@ -53,8 +53,12 @@ func main() {
 	r.Use(middleware.Recoverer)
 	
 	// CORS setup (Crucial for Next.js communication)
+	allowedOrigin := os.Getenv("ALLOWED_ORIGIN")
+	if allowedOrigin == "" {
+		allowedOrigin = "http://localhost:3000"
+	}
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:3000"}, // Next.js default port
+		AllowedOrigins:   []string{allowedOrigin}, // Next.js port or Vercel domain
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,

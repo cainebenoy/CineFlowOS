@@ -20,7 +20,7 @@ export default function StudioDashboard() {
   const fetchProjects = async () => {
     try {
       const token = localStorage.getItem('cineflow_token');
-      const res = await fetch('http://localhost:8080/api/projects', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -38,7 +38,7 @@ export default function StudioDashboard() {
     e.preventDefault();
     try {
       const token = localStorage.getItem('cineflow_token');
-      const res = await fetch('http://localhost:8080/api/projects', {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8080'}/api/projects`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
