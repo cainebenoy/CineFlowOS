@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import OfflineIndicator from "@/components/OfflineIndicator";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,6 +16,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "CineFlow OS — Film Production Platform",
   description: "End-to-end operating system for Indian film and AVGC productions.",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -29,6 +31,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <OfflineIndicator />
         {children}
       </body>
     </html>

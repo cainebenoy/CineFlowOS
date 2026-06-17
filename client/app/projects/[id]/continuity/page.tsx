@@ -12,7 +12,7 @@ export default function ContinuityLogPage() {
   const [lens, setLens] = useState('50mm');
   const [duration, setDuration] = useState('');
   
-  const [takes, setTakes] = useState([]);
+  const [takes, setTakes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch the active scene from the Schedule
@@ -35,9 +35,9 @@ export default function ContinuityLogPage() {
             if (takesData && takesData.length > 0) {
                 setTakes(takesData);
                 // Assume next take is highest take number + 1 for active scene
-                const sceneTakes = takesData.filter(t => t.scene_id === activeSceneId);
+                const sceneTakes = takesData.filter((t: any) => t.scene_id === activeSceneId);
                 if (sceneTakes.length > 0) {
-                    const maxTake = Math.max(...sceneTakes.map(t => t.take_number));
+                    const maxTake = Math.max(...sceneTakes.map((t: any) => t.take_number));
                     setTakeNumber(maxTake + 1);
                 }
             }
@@ -51,7 +51,7 @@ export default function ContinuityLogPage() {
     fetchContext();
   }, [id, activeSceneId]);
 
-  const logTake = async (isCircled) => {
+  const logTake = async (isCircled: boolean) => {
     if (!activeSceneId) return;
 
     const payload = {

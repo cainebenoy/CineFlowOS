@@ -1,0 +1,164 @@
+const CACHE_NAME = 'cineflow-cache-v1';
+const DB_NAME = 'CineFlowSyncDB';
+const DB_VERSION = 1;
+const STORE_NAME = 'offline_mutations';
+
+// IndexedDB Helper in SW
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function enqueueMutation(req) {
+  const db = await openDB();
+  const mutation = {
+    ...req,
+    id: crypto.randomUUID(),
+    queued_at: Date.now(),
+  };
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.add(mutation);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getPendingMutations() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function clearMutation(id) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const request = store.delete(id);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  const { request } = event;
+  
+  // Handle API mutations (POST, PUT, DELETE)
+  if (request.url.includes('/api/') && ['POST', 'PUT', 'DELETE'].includes(request.method)) {
+    event.respondWith(
+      (async () => {
+        try {
+          // Try network first
+          const response = await fetch(request.clone());
+          return response;
+        } catch (error) {
+          // If network fails (offline), serialize and enqueue
+          const clonedReq = request.clone();
+          const headers = {};
+          clonedReq.headers.forEach((val, key) => { headers[key] = val; });
+          
+          let body = '';
+          if (clonedReq.headers.get('content-type')?.includes('application/json')) {
+             body = await clonedReq.text();
+          }
+
+          // Do not queue multipart/form-data for now (script upload) due to blob complexities
+          if (clonedReq.headers.get('content-type')?.includes('multipart/form-data')) {
+            throw error;
+          }
+
+          await enqueueMutation({
+            url: clonedReq.url,
+            method: clonedReq.method,
+            headers: headers,
+            body: body
+          });
+
+          // Return a mock success response so the UI optimistic updates work
+          return new Response(JSON.stringify({ status: "queued", offline: true }), {
+            status: 202,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      })()
+    );
+    return;
+  }
+
+  // Handle standard GET requests (Stale-while-revalidate for static assets)
+  if (request.method === 'GET' && !request.url.includes('/api/')) {
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        const fetchPromise = fetch(request).then((networkResponse) => {
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, networkResponse.clone());
+          });
+          return networkResponse;
+        }).catch(() => cachedResponse); // fallback to cache if offline
+        return cachedResponse || fetchPromise;
+      })
+    );
+  }
+});
+
+// Listen for sync event or custom flush messages
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'FLUSH_QUEUE') {
+    event.waitUntil(flushQueue());
+  }
+});
+
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'sync-mutations') {
+    event.waitUntil(flushQueue());
+  }
+});
+
+async function flushQueue() {
+  const mutations = await getPendingMutations();
+  if (mutations.length === 0) return;
+
+  // Sort by queued_at to preserve order
+  mutations.sort((a, b) => a.queued_at - b.queued_at);
+
+  for (const m of mutations) {
+    try {
+      const response = await fetch(m.url, {
+        method: m.method,
+        headers: m.headers,
+        body: m.body || undefined
+      });
+      if (response.ok || response.status >= 400) {
+        // If it succeeded or failed permanently (e.g., 400), remove from queue
+        await clearMutation(m.id);
+      }
+    } catch (e) {
+      console.log('Sync failed, keeping in queue', e);
+      break; // stop flushing on first network failure
+    }
+  }
+}
