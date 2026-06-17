@@ -241,6 +241,22 @@ func (db *DB) InitSchema() error {
 		notes TEXT,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
+
+	-- RBAC Users Table
+	CREATE TABLE IF NOT EXISTS users (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		email VARCHAR(255) UNIQUE NOT NULL,
+		password_hash VARCHAR(255) NOT NULL,
+		role_name VARCHAR(50) NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	INSERT INTO users (email, password_hash, role_name)
+	VALUES 
+		('lp@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Line Producer'),
+		('ad@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Assistant Director'),
+		('vfx@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'VFX Supervisor')
+	ON CONFLICT (email) DO NOTHING;
 	`
 
 	_, err := db.Pool.Exec(context.Background(), schema)

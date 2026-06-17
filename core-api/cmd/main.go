@@ -13,6 +13,7 @@ import (
 	// REMEMBER: Update this to match your actual go.mod path!
 	"github.com/cainebenoy/CineFlowOS/core-api/internal/database"
 	"github.com/cainebenoy/CineFlowOS/core-api/internal/handlers"
+	customMiddleware "github.com/cainebenoy/CineFlowOS/core-api/internal/middleware"
 )
 
 func main() {
@@ -34,6 +35,7 @@ func main() {
 	}
 
 	// Initialize Handlers
+	authHandler := &handlers.AuthHandler{DB: db}
 	projectHandler := &handlers.ProjectHandler{DB: db}
 	scheduleHandler := &handlers.ScheduleHandler{DB: db}
 
@@ -43,7 +45,7 @@ func main() {
 	// Middleware (logs requests and prevents crashes)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-
+	
 	// CORS setup (Crucial for Next.js communication)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"http://localhost:3000"}, // Next.js default port
@@ -51,6 +53,13 @@ func main() {
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
 	}))
+
+	// Apply JWT Authentication Middleware to all routes
+	// Note: RequireAuth internally allows /api/auth/login and OPTIONS to pass through
+	r.Use(customMiddleware.RequireAuth)
+
+	// Auth Route
+	r.Post("/api/auth/login", authHandler.Login)
 
 	// Define our first route!
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -81,10 +90,11 @@ func main() {
 	whatsappHandler := &handlers.WhatsAppHandler{DB: db}
 	r.Post("/api/projects/{id}/distribute", whatsappHandler.DistributeCallSheet)
 
-	// Financial Budget Ledger
+	// Financial Budget Ledger - Secured for Line Producer only
 	budgetHandler := &handlers.BudgetHandler{DB: db}
-	r.Get("/api/projects/{id}/budget", budgetHandler.GetBudget)
-	r.Put("/api/projects/{id}/budget/elements/{elementId}", budgetHandler.UpdateBudgetItem)
+	lpRouter := r.With(customMiddleware.RequireRole("Line Producer"))
+	lpRouter.Get("/api/projects/{id}/budget", budgetHandler.GetBudget)
+	lpRouter.Put("/api/projects/{id}/budget/elements/{elementId}", budgetHandler.UpdateBudgetItem)
 
 	// Post-Production Deliverables
 	deliverablesHandler := &handlers.DeliverablesHandler{DB: db}
@@ -107,12 +117,12 @@ func main() {
 	r.Post("/api/projects/{id}/expenses/scan", expenseHandler.ScanReceipt)
 	r.Post("/api/projects/{id}/expenses", expenseHandler.LogExpense)
 	r.Get("/api/projects/{id}/expenses", expenseHandler.GetExpenses)
-	r.Put("/api/projects/{id}/expenses/{expenseId}/status", expenseHandler.UpdateExpenseStatus)
+	lpRouter.Put("/api/projects/{id}/expenses/{expenseId}/status", expenseHandler.UpdateExpenseStatus)
 
-	// Tax Automation & Compliance Ledger
+	// Tax Automation & Compliance Ledger - Secured for Line Producer only
 	taxesHandler := &handlers.TaxesHandler{DB: db}
-	r.Get("/api/projects/{id}/taxes", taxesHandler.GetTaxLedger)
-	r.Get("/api/projects/{id}/taxes/export", taxesHandler.ExportTDSReport)
+	lpRouter.Get("/api/projects/{id}/taxes", taxesHandler.GetTaxLedger)
+	lpRouter.Get("/api/projects/{id}/taxes/export", taxesHandler.ExportTDSReport)
 
 	// Daily Progress Report (DPR)
 	dprHandler := &handlers.DPRHandler{DB: db}
