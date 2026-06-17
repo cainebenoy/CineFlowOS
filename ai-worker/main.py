@@ -30,6 +30,7 @@ class SceneExtraction(BaseModel):
     time_of_day: str   # 'DAY', 'NIGHT', 'MAGIC HOUR'
     page_eighths: int
     summary: str
+    requires_vfx: bool
     elements: List[BreakdownElement]
 
 class ScriptBreakdownResult(BaseModel):
@@ -76,6 +77,16 @@ def save_extraction_to_db(project_id: str, extraction: ScriptBreakdownResult):
             """, (project_id, scene.scene_number, scene.setting, scene.time_of_day, scene.page_eighths, scene.summary))
             
             scene_id = cursor.fetchone()[0]
+
+            # Auto-generate VFX shot if required
+            if scene.requires_vfx:
+                # E.g. "SC{scene_number}-VFX-001"
+                shot_code = f"SC{scene.scene_number}-VFX-001"
+                cursor.execute("""
+                    INSERT INTO vfx_shots (project_id, scene_id, shot_code, status)
+                    VALUES (%s, %s, %s, 'Pending Plate') ON CONFLICT DO NOTHING;
+                """, (project_id, scene_id, shot_code))
+
             
             # Insert the Elements and map them to the Scene
             for element in scene.elements:
@@ -121,7 +132,8 @@ async def parse_brief(req: ParseRequest):
             "1. Merge continuous scenes: If actions happen at the same Location and Time without narrative breaks, group them into ONE master scene (e.g., ignore 'CUT TO:' or 'INTERCUT' if they are the same physical space/time). "
             "2. Ensure scenes are numbered sequentially with integers only (1, 2, 3...) - NO letters (A, B, C...). "
             "3. Deduplicate your output: Provide EXACTLY ONE sequence of scenes. Do NOT output the same scene twice. "
-            "4. For each scene, accurately extract setting (INT/EXT), time of day, page_eighths, and explicitly categorize 'Cast', 'Prop', 'Vehicle', and 'Special Equipment' in the elements list."
+            "4. For each scene, accurately extract setting (INT/EXT), time of day, page_eighths, and explicitly categorize 'Cast', 'Prop', 'Vehicle', and 'Special Equipment' in the elements list. "
+            "5. Evaluate if the scene requires visual effects (CGI, green screen, wire removal, muzzle flashes) and set requires_vfx to true if implied."
         )
         
         # Call Gemini and force it to use your Pydantic schema
@@ -232,7 +244,8 @@ async def parse_fountain_script(req: FountainParseRequest):
                 "5. elements: extract EVERY unique Cast member, Prop, Vehicle, Special Equipment, "
                 "   or VFX note mentioned. Use exact category labels: 'Cast', 'Prop', 'Vehicle', "
                 "   'Special Equipment', 'VFX'. "
-                "6. summary: one sentence describing the dramatic action.\n\n"
+                "6. Evaluate if the scene requires visual effects (CGI, green screen, wire removal, muzzle flashes) and set requires_vfx to true if implied. "
+                "7. summary: one sentence describing the dramatic action.\n\n"
                 f"{scene.to_prompt_block()}"
             )
 

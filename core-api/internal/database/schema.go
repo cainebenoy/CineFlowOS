@@ -219,6 +219,28 @@ func (db *DB) InitSchema() error {
 	CREATE TRIGGER expense_tds_trigger
 	BEFORE UPDATE ON expenses
 	FOR EACH ROW EXECUTE FUNCTION calculate_tds_func();
+	-- Track the VFX Shot workflow
+	CREATE TABLE IF NOT EXISTS vfx_shots (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+		scene_id UUID REFERENCES scenes(id) ON DELETE CASCADE,
+		take_id UUID REFERENCES takes(id) ON DELETE SET NULL, 
+		shot_code VARCHAR(50) NOT NULL,
+		status VARCHAR(50) DEFAULT 'Pending Plate', 
+		vendor_assigned VARCHAR(100),
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	-- Track the iterations/files associated with the shot
+	CREATE TABLE IF NOT EXISTS vfx_assets (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		vfx_shot_id UUID REFERENCES vfx_shots(id) ON DELETE CASCADE,
+		asset_type VARCHAR(50), 
+		file_url TEXT NOT NULL, 
+		uploaded_by UUID REFERENCES crew_members(id) ON DELETE SET NULL,
+		notes TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 
 	_, err := db.Pool.Exec(context.Background(), schema)

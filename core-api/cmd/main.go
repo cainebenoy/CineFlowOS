@@ -114,6 +114,12 @@ func main() {
 	r.Get("/api/projects/{id}/taxes", taxesHandler.GetTaxLedger)
 	r.Get("/api/projects/{id}/taxes/export", taxesHandler.ExportTDSReport)
 
+	// VFX Pipeline & Assets
+	r.Get("/api/projects/{id}/vfx", handlers.GetVFXShots(db))
+	r.Post("/api/projects/{id}/vfx", handlers.CreateVFXShot(db))
+	r.Post("/api/projects/{id}/vfx/presigned-url", handlers.GeneratePresignedURL())
+	r.Post("/api/projects/{id}/vfx/assets", handlers.LogVFXAsset(db))
+
 	// Get port from env or default to 8080
 	port := os.Getenv("PORT")
 	if port == "" {

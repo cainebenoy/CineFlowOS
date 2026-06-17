@@ -74,6 +74,12 @@ self.addEventListener('fetch', (event) => {
         try {
           // Try network first
           const response = await fetch(request.clone());
+          
+          // If Go API returns 503 (e.g. Python worker offline) or 502, treat it as offline and enqueue
+          if (!response.ok && (response.status === 503 || response.status === 502)) {
+            throw new Error('Service Unavailable - Treat as Offline');
+          }
+          
           return response;
         } catch (error) {
           // If network fails (offline), serialize and enqueue
@@ -114,9 +120,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         const fetchPromise = fetch(request).then((networkResponse) => {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, networkResponse.clone());
-          });
+          // Only cache successful, basic (same-origin) responses. Avoid caching opaque or streaming HMR responses.
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic' && !request.url.includes('_next/webpack-hmr')) {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseToCache);
+            });
+          }
           return networkResponse;
         }).catch(() => cachedResponse); // fallback to cache if offline
         return cachedResponse || fetchPromise;

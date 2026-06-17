@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutGrid, FileText, CalendarDays, Printer, Clapperboard, Calculator, Film, Terminal, UserCheck, Wallet, Landmark } from 'lucide-react';
+import { LayoutGrid, FileText, CalendarDays, Printer, Clapperboard, Calculator, Film, Terminal, UserCheck, Wallet, Landmark, FileSpreadsheet, Archive } from 'lucide-react';
 
 export default function ProjectNav({ projectId }: { projectId: string }) {
   const pathname = usePathname();
@@ -13,11 +13,12 @@ export default function ProjectNav({ projectId }: { projectId: string }) {
     { name: 'Schedule Board', path: `/projects/${projectId}/schedule`, icon: CalendarDays, exact: false },
     { name: 'Call Sheet', path: `/projects/${projectId}/callsheet`, icon: Printer, exact: false },
     { name: 'Continuity Log', path: `/projects/${projectId}/continuity`, icon: Clapperboard, exact: false },
-    { name: 'Budget', path: `/projects/${projectId}/budget`, icon: Calculator, exact: false },
-    { name: 'Deliverables', path: `/projects/${projectId}/deliverables`, icon: Film, exact: false },
+    { name: 'Financial Ledger', path: `/projects/${projectId}/budget`, icon: Calculator, exact: false },
+    { name: 'Tax & Compliance', path: `/projects/${projectId}/taxes`, icon: FileSpreadsheet, exact: false },
+    { name: 'VFX Pipeline', path: `/projects/${projectId}/vfx`, icon: Film, exact: false },
+    { name: 'Deliverables', path: `/projects/${projectId}/deliverables`, icon: Archive, exact: false },
     { name: 'Crew & Attendance', path: `/projects/${projectId}/crew`, icon: UserCheck, exact: false },
     { name: 'Petty Cash', path: `/projects/${projectId}/expenses`, icon: Wallet, exact: false },
-    { name: 'Tax & Compliance', path: `/projects/${projectId}/taxes`, icon: Landmark, exact: false },
     { name: 'Activity Feed', path: `/projects/${projectId}/audit`, icon: Terminal, exact: false },
   ];
 
