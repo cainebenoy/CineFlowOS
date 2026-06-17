@@ -31,6 +31,8 @@ func (db *DB) InitSchema() error {
 		project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
 		category VARCHAR(50) NOT NULL,
 		name VARCHAR(255) NOT NULL,
+		estimated_cost DECIMAL(12,2) DEFAULT 0.00,
+		actual_cost DECIMAL(12,2) DEFAULT 0.00,
 		CONSTRAINT unique_project_element UNIQUE (project_id, category, name)
 	);
 
@@ -70,6 +72,27 @@ func (db *DB) InitSchema() error {
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		CONSTRAINT unique_scene_take UNIQUE (scene_id, take_number)
 	);
+
+	CREATE TABLE IF NOT EXISTS crew_members (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+		name VARCHAR(255) NOT NULL,
+		role VARCHAR(100) NOT NULL,
+		phone_number VARCHAR(20) NOT NULL,
+		is_active BOOLEAN DEFAULT TRUE,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		CONSTRAINT unique_crew_member UNIQUE (project_id, phone_number)
+	);
+
+	INSERT INTO crew_members (project_id, name, role, phone_number) 
+	VALUES 
+		('85bf2069-e3fe-40e8-8739-8ad1cbeebf87', 'Adhityan', 'Director of Photography', '+919876543210'),
+		('85bf2069-e3fe-40e8-8739-8ad1cbeebf87', 'Mohamed', 'Gaffer', '+919876543211'),
+		('85bf2069-e3fe-40e8-8739-8ad1cbeebf87', 'Cyril', 'Transport Coordinator', '+919876543212')
+	ON CONFLICT (project_id, phone_number) DO NOTHING;
+
+	ALTER TABLE breakdown_elements ADD COLUMN IF NOT EXISTS estimated_cost DECIMAL(12,2) DEFAULT 0.00;
+	ALTER TABLE breakdown_elements ADD COLUMN IF NOT EXISTS actual_cost DECIMAL(12,2) DEFAULT 0.00;
 	`
 
 	_, err := db.Pool.Exec(context.Background(), schema)

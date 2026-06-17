@@ -73,6 +73,15 @@ func main() {
 	r.Get("/api/projects/{id}/takes", takeHandler.GetProjectTakes)
 	r.Post("/api/projects/{id}/takes", takeHandler.LogTake)
 
+	// WhatsApp Distribution Engine
+	whatsappHandler := &handlers.WhatsAppHandler{DB: db}
+	r.Post("/api/projects/{id}/distribute", whatsappHandler.DistributeCallSheet)
+
+	// Financial Budget Ledger
+	budgetHandler := &handlers.BudgetHandler{DB: db}
+	r.Get("/api/projects/{id}/budget", budgetHandler.GetBudget)
+	r.Put("/api/projects/{id}/budget/elements/{elementId}", budgetHandler.UpdateBudgetItem)
+
 	// Get port from env or default to 8080
 	port := os.Getenv("PORT")
 	if port == "" {

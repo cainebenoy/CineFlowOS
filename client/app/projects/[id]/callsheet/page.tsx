@@ -1,4 +1,5 @@
 import PrintButton from './PrintButton';
+import DistributeButton from './DistributeButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,7 +40,8 @@ export default async function CallSheetPage({ params }: { params: Promise<{ id: 
   return (
     <main className="bg-neutral-200 p-8 md:p-12 min-h-screen print:bg-white print:p-0">
       {/* Action Bar (Hidden when printing) */}
-      <div className="max-w-[800px] mx-auto mb-4 flex justify-end print:hidden">
+      <div className="max-w-[800px] mx-auto mb-4 flex justify-end gap-3 print:hidden">
+        <DistributeButton projectId={id} />
         <PrintButton />
       </div>
 
