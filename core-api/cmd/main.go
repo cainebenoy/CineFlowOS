@@ -98,6 +98,13 @@ func main() {
 	r.Post("/api/projects/{id}/attendance/check-in", attendanceHandler.LogCheckIn)
 	r.Get("/api/projects/{id}/attendance/today", attendanceHandler.GetTodaysAttendance)
 
+	// OCR Receipt Scanner & Petty Cash Ledger
+	expenseHandler := &handlers.ExpenseHandler{DB: db}
+	r.Post("/api/projects/{id}/expenses/scan", expenseHandler.ScanReceipt)
+	r.Post("/api/projects/{id}/expenses", expenseHandler.LogExpense)
+	r.Get("/api/projects/{id}/expenses", expenseHandler.GetExpenses)
+	r.Put("/api/projects/{id}/expenses/{expenseId}/status", expenseHandler.UpdateExpenseStatus)
+
 	// Get port from env or default to 8080
 	port := os.Getenv("PORT")
 	if port == "" {

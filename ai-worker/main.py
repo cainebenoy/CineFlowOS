@@ -1,5 +1,8 @@
 import os
+import base64
 import psycopg2
+from io import BytesIO
+from PIL import Image
 from psycopg2.extras import RealDictCursor
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -143,6 +146,74 @@ async def parse_brief(req: ParseRequest):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── OCR Receipt Scanner ──────────────────────────────────────────────────────
+
+class ReceiptExtraction(BaseModel):
+    vendor_name: str
+    gstin: Optional[str] = None
+    amount: float
+    # Gemini will auto-categorize: 'Catering', 'Transport', 'Art Dept', etc.
+    category: str
+
+class ReceiptRequest(BaseModel):
+    project_id: str
+    # The receipt photo encoded as a base64 string (sent from Go gateway)
+    image_base64: str
+    mime_type: str = "image/jpeg"  # image/jpeg or image/png
+
+@app.post("/api/ai/scan-receipt")
+async def scan_receipt(req: ReceiptRequest):
+    """
+    Accepts a base64-encoded receipt image, sends it to Gemini 2.5 Flash
+    via multimodal vision, and returns a structured ReceiptExtraction JSON.
+    This endpoint is called exclusively by the Go gateway — never directly
+    from the browser — keeping this service private and auth-controlled.
+    """
+    try:
+        # Decode the base64 image into raw bytes
+        image_bytes = base64.b64decode(req.image_base64)
+
+        # Wrap in a Gemini-compatible inline data part (no file upload needed)
+        image_part = types.Part.from_bytes(
+            data=image_bytes,
+            mime_type=req.mime_type,
+        )
+
+        system_prompt = (
+            "You are a precise accounting AI for an Indian film production company. "
+            "Analyze this receipt image carefully and extract: "
+            "1. vendor_name: The full business/vendor name on the receipt. "
+            "2. gstin: The GST Identification Number (15-character alphanumeric), or null if not present. "
+            "3. amount: The final total amount paid (as a number, no currency symbols). "
+            "4. category: Classify the expense into exactly one of: "
+            "'Catering', 'Transport', 'Art Department', 'Camera', 'Lighting', "
+            "'Location', 'Costume', 'Makeup', 'Post Production', 'Miscellaneous'. "
+            "Be strictly accurate. If a value is unclear, make your best inference."
+        )
+
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[system_prompt, image_part],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=ReceiptExtraction,
+            ),
+        )
+
+        extraction = ReceiptExtraction.model_validate_json(response.text)
+
+        return {
+            "status": "success",
+            "data": extraction.model_dump()
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import uvicorn

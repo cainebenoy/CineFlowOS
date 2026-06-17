@@ -146,6 +146,21 @@ func (db *DB) InitSchema() error {
 	-- Prevent double clock-ins on the same calendar day per crew member
 	CREATE UNIQUE INDEX IF NOT EXISTS unique_daily_checkin
 	ON attendance_logs (crew_id, (check_in_time::DATE));
+
+	-- OCR Receipt Scanner: Petty cash expense ledger
+	CREATE TABLE IF NOT EXISTS expenses (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+		uploaded_by UUID REFERENCES crew_members(id) ON DELETE SET NULL,
+		vendor_name VARCHAR(255),
+		gstin VARCHAR(20),
+		amount DECIMAL(12,2) NOT NULL,
+		category VARCHAR(100),
+		receipt_image_url TEXT,
+		status VARCHAR(20) DEFAULT 'Pending',
+		notes TEXT,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
 	`
 
 	_, err := db.Pool.Exec(context.Background(), schema)
