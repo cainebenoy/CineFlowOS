@@ -80,12 +80,6 @@ func RequireAuth(next http.Handler) http.Handler {
 func RequireProjectAccess(db *database.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			claims, ok := GetClaims(r.Context())
-			if !ok {
-				http.Error(w, "Unauthorized context missing", http.StatusUnauthorized)
-				return
-			}
-
 			// Extract project ID from URL parameters
 			// Assuming we use chi Router which injects URLParams into context
 			var projectID string
@@ -104,6 +98,12 @@ func RequireProjectAccess(db *database.DB) func(http.Handler) http.Handler {
 			if projectID == "" {
 				// Not a project specific route
 				next.ServeHTTP(w, r)
+				return
+			}
+
+			claims, ok := GetClaims(r.Context())
+			if !ok {
+				http.Error(w, "Unauthorized context missing", http.StatusUnauthorized)
 				return
 			}
 
@@ -154,6 +154,56 @@ func RequireRole(allowedRoles ...string) func(http.Handler) http.Handler {
 			}
 
 			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+const StudioRoleContextKey contextKey = "studio_role"
+
+func GetStudioRole(ctx context.Context) (string, bool) {
+	role, ok := ctx.Value(StudioRoleContextKey).(string)
+	return role, ok
+}
+
+// RequireStudioAccess verifies the user is assigned to the studio and injects their studio-specific role
+func RequireStudioAccess(db *database.DB) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Extract studio ID from URL parameters
+			var studioID string
+			parts := strings.Split(r.URL.Path, "/")
+			for i, p := range parts {
+				if p == "studios" && i+1 < len(parts) {
+					studioID = parts[i+1]
+					break
+				}
+			}
+
+			if studioID == "" {
+				// Not a studio specific route
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			claims, ok := GetClaims(r.Context())
+			if !ok {
+				http.Error(w, "Unauthorized context missing", http.StatusUnauthorized)
+				return
+			}
+
+			var roleName string
+			err := db.Pool.QueryRow(context.Background(), `
+				SELECT role_name FROM studio_users WHERE studio_id = $1 AND user_id = $2
+			`, studioID, claims.UserID).Scan(&roleName)
+
+			if err != nil {
+				http.Error(w, "Forbidden: not assigned to this studio", http.StatusForbidden)
+				return
+			}
+
+			// Inject studio role into context
+			ctx := context.WithValue(r.Context(), StudioRoleContextKey, roleName)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }

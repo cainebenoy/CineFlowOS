@@ -70,6 +70,9 @@ func main() {
 	
 	// Apply Project Access Verification (Passes through if no {id} in URL)
 	r.Use(customMiddleware.RequireProjectAccess(db))
+	
+	// Apply Studio Access Verification (Passes through if no {id} in URL)
+	r.Use(customMiddleware.RequireStudioAccess(db))
 
 	// Auth Route
 	r.Post("/api/auth/login", authHandler.Login)
@@ -80,6 +83,9 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("CineFlow Core API is live and healthy!"))
 	})
+
+	// Studio Routes
+	r.Get("/api/studios/{id}/finance/slate", handlers.GetStudioSlate(db))
 
 	// Define explicit routes (handles the missing trailing slash natively)
 	r.Get("/api/projects", projectHandler.GetProjects)

@@ -8,13 +8,22 @@ import (
 // InitSchema creates the foundational tables if they do not exist.
 func (db *DB) InitSchema() error {
 	schema := `
+	CREATE TABLE IF NOT EXISTS studios (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		name VARCHAR(255) NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
 	CREATE TABLE IF NOT EXISTS projects (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		studio_id UUID REFERENCES studios(id) ON DELETE CASCADE,
 		title VARCHAR(255) NOT NULL,
 		project_type VARCHAR(50) NOT NULL,
 		status VARCHAR(50) DEFAULT 'active',
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
+
+	ALTER TABLE projects ADD COLUMN IF NOT EXISTS studio_id UUID REFERENCES studios(id) ON DELETE CASCADE;
 
 	CREATE TABLE IF NOT EXISTS scenes (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -262,13 +271,30 @@ func (db *DB) InitSchema() error {
 		PRIMARY KEY (project_id, user_id)
 	);
 
+	-- Multi-Tenancy Studio Users Table (Authorization)
+	CREATE TABLE IF NOT EXISTS studio_users (
+		studio_id UUID REFERENCES studios(id) ON DELETE CASCADE,
+		user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+		role_name VARCHAR(50) NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (studio_id, user_id)
+	);
+
+	-- Seed Demo Studio
+	INSERT INTO studios (id, name)
+	VALUES ('11111111-1111-1111-1111-111111111111', 'CineFlow Demo Studio')
+	ON CONFLICT (id) DO NOTHING;
+
 	-- Seed Demo Users
 	INSERT INTO users (email, password_hash)
 	VALUES 
-		('lp@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'),
-		('ad@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy'),
-		('vfx@cineflow.com', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy')
-	ON CONFLICT (email) DO NOTHING;
+		('lp@cineflow.com', '$2a$10$OnZorV.K9MWrdf62XHr5JuKm0AKIlTevQv1cELVP97FgKj2/D/Lga'),
+		('ad@cineflow.com', '$2a$10$OnZorV.K9MWrdf62XHr5JuKm0AKIlTevQv1cELVP97FgKj2/D/Lga'),
+		('vfx@cineflow.com', '$2a$10$OnZorV.K9MWrdf62XHr5JuKm0AKIlTevQv1cELVP97FgKj2/D/Lga')
+	ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+
+	-- Ensure the existing demo project belongs to the Demo Studio
+	UPDATE projects SET studio_id = '11111111-1111-1111-1111-111111111111' WHERE id = '85bf2069-e3fe-40e8-8739-8ad1cbeebf87';
 
 	-- Seed Project Access for Demo Users
 	INSERT INTO project_users (project_id, user_id, role_name)
@@ -281,6 +307,12 @@ func (db *DB) InitSchema() error {
 	FROM users 
 	WHERE email IN ('lp@cineflow.com', 'ad@cineflow.com', 'vfx@cineflow.com')
 	ON CONFLICT (project_id, user_id) DO NOTHING;
+
+	-- Seed Studio Access for the Line Producer (Executive Producer role)
+	INSERT INTO studio_users (studio_id, user_id, role_name)
+	SELECT '11111111-1111-1111-1111-111111111111', id, 'Executive Producer'
+	FROM users WHERE email = 'lp@cineflow.com'
+	ON CONFLICT (studio_id, user_id) DO NOTHING;
 	`
 
 	_, err := db.Pool.Exec(context.Background(), schema)

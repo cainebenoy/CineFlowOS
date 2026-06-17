@@ -66,6 +66,11 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+
+  // Bypass all Next.js internal requests (HMR, chunks, etc)
+  if (request.url.includes('/_next/')) {
+    return;
+  }
   
   // Handle API mutations (POST, PUT, DELETE)
   if (request.url.includes('/api/') && ['POST', 'PUT', 'DELETE'].includes(request.method)) {
