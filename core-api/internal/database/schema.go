@@ -93,6 +93,39 @@ func (db *DB) InitSchema() error {
 
 	ALTER TABLE breakdown_elements ADD COLUMN IF NOT EXISTS estimated_cost DECIMAL(12,2) DEFAULT 0.00;
 	ALTER TABLE breakdown_elements ADD COLUMN IF NOT EXISTS actual_cost DECIMAL(12,2) DEFAULT 0.00;
+
+	-- 1. Create the Audit Table
+	CREATE TABLE IF NOT EXISTS system_audit_logs (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+		table_name VARCHAR(50) NOT NULL,
+		action VARCHAR(10) NOT NULL,
+		record_id UUID NOT NULL,
+		old_data JSONB,
+		new_data JSONB,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+	);
+
+	-- 2. Create the Trigger Function
+	CREATE OR REPLACE FUNCTION audit_financials_func() RETURNS trigger AS $$
+	BEGIN
+		IF TG_OP = 'UPDATE' THEN
+			-- Only log if the financial numbers actually changed
+			IF OLD.estimated_cost IS DISTINCT FROM NEW.estimated_cost OR OLD.actual_cost IS DISTINCT FROM NEW.actual_cost THEN
+				INSERT INTO system_audit_logs (project_id, table_name, action, record_id, old_data, new_data)
+				VALUES (NEW.project_id, TG_TABLE_NAME, TG_OP, NEW.id, row_to_json(OLD), row_to_json(NEW));
+			END IF;
+			RETURN NEW;
+		END IF;
+		RETURN NULL;
+	END;
+	$$ LANGUAGE plpgsql;
+
+	-- 3. Attach the Trigger to the Budget Elements
+	DROP TRIGGER IF EXISTS audit_budget_trigger ON breakdown_elements;
+	CREATE TRIGGER audit_budget_trigger
+	AFTER UPDATE ON breakdown_elements
+	FOR EACH ROW EXECUTE FUNCTION audit_financials_func();
 	`
 
 	_, err := db.Pool.Exec(context.Background(), schema)

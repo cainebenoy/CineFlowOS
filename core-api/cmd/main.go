@@ -82,6 +82,16 @@ func main() {
 	r.Get("/api/projects/{id}/budget", budgetHandler.GetBudget)
 	r.Put("/api/projects/{id}/budget/elements/{elementId}", budgetHandler.UpdateBudgetItem)
 
+	// Post-Production Deliverables
+	deliverablesHandler := &handlers.DeliverablesHandler{DB: db}
+	r.Get("/api/projects/{id}/deliverables/dashboard", deliverablesHandler.GetDeliverablesDashboard)
+	r.Get("/api/projects/{id}/deliverables/editor-turnover", deliverablesHandler.ExportEditorTurnover)
+	r.Get("/api/projects/{id}/deliverables/vfx-pulls", deliverablesHandler.GetVFXPullList)
+
+	// System Audit Logs
+	auditHandler := &handlers.AuditHandler{DB: db}
+	r.Get("/api/projects/{id}/audit", auditHandler.GetAuditLogs)
+
 	// Get port from env or default to 8080
 	port := os.Getenv("PORT")
 	if port == "" {

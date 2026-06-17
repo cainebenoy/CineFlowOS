@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutGrid, FileText, CalendarDays, Printer, Clapperboard, Calculator } from 'lucide-react';
+import { LayoutGrid, FileText, CalendarDays, Printer, Clapperboard, Calculator, Film, Terminal } from 'lucide-react';
 
 export default function ProjectNav({ projectId }: { projectId: string }) {
   const pathname = usePathname();
@@ -14,6 +14,8 @@ export default function ProjectNav({ projectId }: { projectId: string }) {
     { name: 'Call Sheet', path: `/projects/${projectId}/callsheet`, icon: Printer, exact: false },
     { name: 'Continuity Log', path: `/projects/${projectId}/continuity`, icon: Clapperboard, exact: false },
     { name: 'Budget', path: `/projects/${projectId}/budget`, icon: Calculator, exact: false },
+    { name: 'Deliverables', path: `/projects/${projectId}/deliverables`, icon: Film, exact: false },
+    { name: 'Activity Feed', path: `/projects/${projectId}/audit`, icon: Terminal, exact: false },
   ];
 
   return (
