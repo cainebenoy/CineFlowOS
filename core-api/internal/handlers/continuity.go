@@ -7,10 +7,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/cainebenoy/CineFlowOS/core-api/internal/websocket"
 )
 
 type TakeHandler struct {
-	DB *pgxpool.Pool
+	DB  *pgxpool.Pool
+	Hub *websocket.Hub
 }
 
 type TakePayload struct {
@@ -57,6 +59,20 @@ func (h *TakeHandler) LogTake(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Broadcast the event to all connected clients in this project room
+	if h.Hub != nil {
+		eventPayload, _ := json.Marshal(map[string]interface{}{
+			"type": "TAKE_LOGGED",
+			"payload": map[string]interface{}{
+				"id":          takeID,
+				"scene_id":    payload.SceneID,
+				"take_number": payload.TakeNumber,
+				"is_circled":  payload.IsCircled,
+			},
+		})
+		h.Hub.BroadcastToProject(projectID, eventPayload)
 	}
 
 	w.WriteHeader(http.StatusCreated)

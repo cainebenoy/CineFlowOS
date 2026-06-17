@@ -40,8 +40,8 @@ func RequireAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// Allow public auth routes to pass through
-		if r.URL.Path == "/api/auth/login" || r.Method == "OPTIONS" {
+		// Bypass authentication for public routes
+		if r.URL.Path == "/api/auth/login" || r.URL.Path == "/health" || r.URL.Path == "/api/ws" || r.Method == "OPTIONS" {
 			next.ServeHTTP(w, r)
 			return
 		}

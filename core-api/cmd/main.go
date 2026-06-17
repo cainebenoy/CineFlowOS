@@ -14,6 +14,7 @@ import (
 	"github.com/cainebenoy/CineFlowOS/core-api/internal/database"
 	"github.com/cainebenoy/CineFlowOS/core-api/internal/handlers"
 	customMiddleware "github.com/cainebenoy/CineFlowOS/core-api/internal/middleware"
+	"github.com/cainebenoy/CineFlowOS/core-api/internal/websocket"
 )
 
 func main() {
@@ -34,10 +35,15 @@ func main() {
 		log.Fatalf("Fatal error initializing schema: %v", err)
 	}
 
+	// Initialize WebSocket Hub
+	hub := websocket.NewHub()
+	go hub.Run()
+
 	// Initialize Handlers
 	authHandler := &handlers.AuthHandler{DB: db}
 	projectHandler := &handlers.ProjectHandler{DB: db}
 	scheduleHandler := &handlers.ScheduleHandler{DB: db}
+	wsHandler := &handlers.WebSocketHandler{DB: db, Hub: hub}
 
 	// Set up the HTTP Router
 	r := chi.NewRouter()
@@ -63,6 +69,7 @@ func main() {
 
 	// Auth Route
 	r.Post("/api/auth/login", authHandler.Login)
+	r.Get("/api/ws", wsHandler.HandleConnections)
 
 	// Define our first route!
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +90,7 @@ func main() {
 	// Initialize the handlers
 	callSheetHandler := &handlers.CallSheetHandler{DB: db}
 	r.Get("/api/projects/{id}/callsheet", callSheetHandler.GenerateCallSheet)
-	takeHandler := &handlers.TakeHandler{DB: db.Pool}
+	takeHandler := &handlers.TakeHandler{DB: db.Pool, Hub: hub}
 
 	// Continuity Log endpoints
 	r.Get("/api/projects/{id}/takes", takeHandler.GetProjectTakes)
@@ -116,7 +123,7 @@ func main() {
 	r.Get("/api/projects/{id}/attendance/today", attendanceHandler.GetTodaysAttendance)
 
 	// OCR Receipt Scanner & Petty Cash Ledger
-	expenseHandler := &handlers.ExpenseHandler{DB: db}
+	expenseHandler := &handlers.ExpenseHandler{DB: db, Hub: hub}
 	r.Post("/api/projects/{id}/expenses/scan", expenseHandler.ScanReceipt)
 	r.Post("/api/projects/{id}/expenses", expenseHandler.LogExpense)
 	r.Get("/api/projects/{id}/expenses", expenseHandler.GetExpenses)

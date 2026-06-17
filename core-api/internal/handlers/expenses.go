@@ -12,10 +12,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/cainebenoy/CineFlowOS/core-api/internal/database"
+	"github.com/cainebenoy/CineFlowOS/core-api/internal/websocket"
 )
 
 type ExpenseHandler struct {
-	DB *database.DB
+	DB  *database.DB
+	Hub *websocket.Hub
 }
 
 // ScanReceiptRequest is the payload from the Next.js client
