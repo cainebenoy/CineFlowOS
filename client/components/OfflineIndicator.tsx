@@ -8,11 +8,19 @@ export default function OfflineIndicator() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    // Register Service Worker
+    // Only register Service Worker in production.
+    // In development, HMR conflicts with SW caching and causes reload loops.
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(err => {
-        console.error('Service Worker registration failed:', err);
-      });
+      if (process.env.NODE_ENV === 'production') {
+        navigator.serviceWorker.register('/sw.js').catch(err => {
+          console.error('Service Worker registration failed:', err);
+        });
+      } else {
+        // Unregister any existing SW in development to prevent stale cache issues
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+          registrations.forEach(reg => reg.unregister());
+        });
+      }
     }
 
     // Initial check

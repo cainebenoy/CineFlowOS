@@ -52,7 +52,7 @@ export default function StudioDashboard({
     };
 
     fetchSlate();
-  }, [studioId, router]);
+  }, [studioId]);
 
   if (isLoading) return <div className="p-8 text-neutral-500">Loading studio financials...</div>;
   if (error) return <div className="p-8 text-red-500">Error: {error}</div>;

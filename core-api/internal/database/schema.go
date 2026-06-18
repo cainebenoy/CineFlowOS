@@ -68,7 +68,6 @@ func (db *DB) InitSchema() error {
 		CONSTRAINT unique_scheduled_scene UNIQUE (scene_id)
 	);
 
-	DROP TABLE IF EXISTS takes CASCADE;
 	CREATE TABLE IF NOT EXISTS takes (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		project_id UUID REFERENCES projects(id) ON DELETE CASCADE,

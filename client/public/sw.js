@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cineflow-cache-v1';
+const CACHE_NAME = 'cineflow-cache-v2';
 const DB_NAME = 'CineFlowSyncDB';
 const DB_VERSION = 1;
 const STORE_NAME = 'offline_mutations';
@@ -61,7 +61,15 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      );
+    }).then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener('fetch', (event) => {
@@ -120,23 +128,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle standard GET requests (Stale-while-revalidate for static assets)
-  if (request.method === 'GET' && !request.url.includes('/api/')) {
-    event.respondWith(
-      caches.match(request).then((cachedResponse) => {
-        const fetchPromise = fetch(request).then((networkResponse) => {
-          // Only cache successful, basic (same-origin) responses. Avoid caching opaque or streaming HMR responses.
-          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic' && !request.url.includes('_next/webpack-hmr')) {
-            const responseToCache = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(request, responseToCache);
-            });
-          }
-          return networkResponse;
-        }).catch(() => cachedResponse); // fallback to cache if offline
-        return cachedResponse || fetchPromise;
-      })
-    );
+  // Handle standard GET requests (Stale-while-revalidate for static assets ONLY)
+  // Never cache HTML page navigations — only cache JS, CSS, images, fonts
+  if (request.method === 'GET' && !request.url.includes('/api/') && !request.url.includes('_next/webpack-hmr')) {
+    const url = new URL(request.url);
+    const isStaticAsset = /\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf)$/i.test(url.pathname);
+    
+    if (isStaticAsset) {
+      event.respondWith(
+        caches.match(request).then((cachedResponse) => {
+          const fetchPromise = fetch(request).then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(request, responseToCache);
+              });
+            }
+            return networkResponse;
+          }).catch(() => cachedResponse); // fallback to cache if offline
+          return cachedResponse || fetchPromise;
+        })
+      );
+    }
+    // For HTML page navigations, let the browser handle them normally (no SW interception)
   }
 });
 
